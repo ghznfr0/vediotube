@@ -33,6 +33,11 @@ const registerUser = asyncHandler( async (req, res) => {
     ) {
         throw new ApiError(400, "All fileds are required!")
     }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+        throw new ApiError(400, "Invalid email format! Please use a valid email.");
+    }
     
     // check user already existed
     const existedUser = await User.findOne({
@@ -95,6 +100,11 @@ const loginUser = asyncHandler(async (req, res)=> {
 
     if(!(username || email)) {
         throw new ApiError(400, "Username or email is required")
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+        throw new ApiError(400, "Invalid email format! Please use a valid email.");
     }
 
     const user = await User.findOne({
@@ -174,9 +184,194 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     )
 })
 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+    const {oldPassword, newPassword, confirmPassword} = req.body
+    const user = await User.findById(req.user?._id)
+
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+    if(!isPasswordCorrect) {
+        throw new ApiError(400, "invalid old password")
+    }
+
+    if(newPassword !== confirmPassword) {
+        throw new ApiError(401, "You are adding wrong passwords!")
+    }
+
+    user.password = newPassword
+    await user.save({validateBeforeSave: false})
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, {}, "Password changed successfully!")
+    )
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user?._id).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user, "User fetched successfully!")
+    )
+})
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const {fullName, email} = req.body
+    if(!fullName || !email) {
+        throw new ApiError(401, "email and fullName are required")
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+        throw new ApiError(400, "Invalid email format! Please use a valid email.");
+    }
+
+    const user = await User.findByIdAndUpdate(req.user._id, {
+        $set: {
+            fullName,
+            email
+        }
+    }, {new: true}).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user, "Account details updated successfully!")
+    )
+})
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+    const avatarLocalPath = req.file?.path
+     if(!avatarLocalPath) {
+        throw new ApiError(401, "Avatar is notuploaded locally")
+     }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+    
+    if(!avatar) {
+        throw new ApiError(500, "Avatar is not uploaded on cloudinary")
+    }
+
+    const user = await User.findByIdAndUpdate(req.user._id, 
+        {
+            $set: {avatar: avatar.url}
+        },
+        {new: true}).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user, "Avatar updated successfully!")
+    )
+})
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+    const coverImagerLocalPath = req.file?.path
+     if(!coverImagerLocalPath) {
+        throw new ApiError(401, "Cover image is not uploaded locally")
+     }
+
+    const coverImage = await uploadOnCloudinary(coverImagerLocalPath)
+    
+    if(!coverImage) {
+        throw new ApiError(500, "coverImage is not uploaded on cloudinary")
+    }
+
+    const user = await User.findByIdAndUpdate(req.user._id, 
+        {
+            $set: {coverImage: coverImage.url}
+        },
+        {new: true}).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user, "coverImage updated successfully!")
+    )
+})
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    const {username} = req.params
+    if(!username?.trim()) {
+        throw new ApiError(400, "Username is missing")
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match: {
+                username: username.toLowerCase()
+            }
+        },
+        {
+            $lookup: {
+                from: 'Subscription',
+                localField: '_id',
+                foreignField: 'channel',
+                as: 'subscribers'
+            }
+        },
+        {
+            $lookup: {
+                from: 'Subscription',
+                localField: '_id',
+                foreignField: 'subscriber',
+                as: 'subscriberedTo'
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: '$subscribers'
+                },
+                channelsSubscriberedToCount: {
+                    $size: '$subscriberedTo'
+                },
+                isSubscribered: {
+                    $cond: {
+                        if: {$in: [req.user?._id, '$subscribers.subscriber']},
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                fullName: 1,
+                username: 1,
+                subscribersCount: 1,
+                channelsSubscriberedToCount: 1,
+                isSubscribered: 1,
+                avatar: 1,
+                coverImage: 1
+            }
+        }
+    ])
+    
+    if(!channel?.length) {
+        throw new ApiError(404, "Channel does not exist!")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "User channel fetched successfully!")
+    )
+    
+})
+
 export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage,
+    getUserChannelProfile
 }
