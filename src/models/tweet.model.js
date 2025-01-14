@@ -1,6 +1,6 @@
 import mongoose, {Schema} from 'mongoose'
 
-const twwetSchema = new Schema({
+const tweetSchema = new Schema({
     content: {
         type: String,
         required: true
@@ -11,4 +11,4 @@ const twwetSchema = new Schema({
     }
 }, {timestamps: true})
 
-export const Tweet = mongoose.model('Tweet', twwetSchema)
+export const Tweet = mongoose.model('Tweet', tweetSchema)
