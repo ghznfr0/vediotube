@@ -14,6 +14,11 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Title and description are required!")
     }
 
+    const owner = req.user?._id
+    if(!owner) {
+        throw new ApiError(404, "Unauthorized! user must me login to publish a video!")
+    }
+
     const videoFileLocalPath = req.files?.videoFile[0]?.path
     const thumbnailLocalPath = req.files?.thumbnail[0]?.path
 
@@ -29,11 +34,12 @@ const publishAVideo = asyncHandler(async (req, res) => {
     const thumbnail = await uploadOnCloudinary(thumbnailLocalPath)
 
     const video = await Video.create({
-        videoFile: videoFile.url,
-        thumbnail: thumbnail.url,
         title,
         description,
-        duration: videoFile.duration
+        duration: videoFile.duration,
+        owner,
+        videoFile: videoFile.url,
+        thumbnail: thumbnail.url
     })
     
     return res

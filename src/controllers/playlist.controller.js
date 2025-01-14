@@ -81,23 +81,94 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
     const {playlistId, videoId} = req.params
+    if(!playlistId || !videoId) {
+        throw new ApiError(402, "playlistId and videoId are required!")
+    }
+
+
+   const playlist =  await Playlist.findById(playlistId)
+   
+   if(!playlist) {
+    throw new ApiError(500, "Playlist not found!")
+}
+
+    if(playlist.videos.includes(videoId)) {
+        throw new ApiError(409, "Video already exist in the playlist!")
+    }
+
+    playlist.videos.push(videoId)
+
+    await playlist.save({validateBeforeSave: false})
+
+    
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, playlist, "Added video to playlist successfully!")
+    )
+
 })
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     const {playlistId, videoId} = req.params
-    // TODO: remove video from playlist
+    if(!playlistId || !videoId) {
+        throw new ApiError(401, "playlist and video ids are required!")
+    }
+
+    const playlist = await Playlist.findById(playlistId)
+
+    if(!playlist.videos.includes(videoId)) {
+        throw new ApiError(500, "This video is not available in this playlist!")
+    }
+
+    playlist.videos.pop(videoId)
+
+    const removed = await playlist.save({validateBeforeSave: false})
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, removed, "Video removed successfully")
+    )
+
 
 })
 
 const deletePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
-    // TODO: delete playlist
+    await Playlist.findByIdAndDelete(playlistId)
+    return res.status(202).json(
+        new ApiResponse(202, {}, "Playlist updated successfully!")
+    )
 })
 
 const updatePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     const {name, description} = req.body
-    //TODO: update playlist
+
+    if(!playlistId) {
+        throw new ApiError(404, "Playlist not found!")
+    }
+
+    if(!name || !description) {
+        throw new ApiError(402, "name and description is required to update playlist!")
+    }
+
+    const playlist = await Playlist.findByIdAndUpdate(playlistId,
+        {
+            $set: {
+                name,
+                description
+            }
+        }, {new: true}
+    )
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, playlist, "playlist Updated successfully!")
+    )
 })
 
 export {
