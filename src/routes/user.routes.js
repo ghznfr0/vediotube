@@ -26,13 +26,13 @@ router.post('/logout', verifyJWT, logoutUser)
 router.post('/refresh-token', refreshAccessToken)
 router.post('/change-password', verifyJWT, changeCurrentPassword)
 router.get('/get-user', verifyJWT, getCurrentUser)
-router.post('/update-user', verifyJWT, updateAccountDetails)
+router.patch('/update-user', verifyJWT, updateAccountDetails)
 
-router.post('/update-avatar', verifyJWT, 
+router.patch('/update-avatar', verifyJWT, 
     upload.single('avatar'),
     updateUserAvatar)
 
-router.post('/update-cover', verifyJWT,
+router.patch('/update-cover', verifyJWT,
     upload.single('coverImage'),
     updateUserCoverImage
 )
